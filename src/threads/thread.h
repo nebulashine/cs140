@@ -98,6 +98,9 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 #endif
 
+    int recent_cpu;			/* Recent cpu occupancy of this thread. Fixd-point. */
+    int nice;				/* Integer -20 ~ 20 */
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

@@ -23,6 +23,8 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+static struct list * ready_array;	/* 64 - ready list array for advance priority*/
+
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -59,6 +61,8 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
+static int load_avg;	/* load average. fixed-point number*/
+
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -90,6 +94,13 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
+
+	/* allocate ready_array*/
+	ready_array = malloc(sizeof(struct list) * 64);
+	for (int i = 0; i < 64; i++) {
+		list_init (&ready_array[i]);
+	}
+
   list_init (&ready_list);
   list_init (&all_list);
 
@@ -237,7 +248,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+//  list_push_back (&ready_list, &t->elem);
+  list_push_back (&ready_array[t->priority], &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -308,7 +320,8 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+   // list_push_back (&ready_list, &cur->elem);
+    list_push_back (&ready_array[cur->priority], &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -463,6 +476,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  t->recent_cpu = 0; /* initialize it to be 0*/
+  t->nice = 0;	/* set to 0 */
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
@@ -487,6 +502,7 @@ alloc_frame (struct thread *t, size_t size)
    empty.  (If the running thread can continue running, then it
    will be in the run queue.)  If the run queue is empty, return
    idle_thread. */
+/*
 static struct thread *
 next_thread_to_run (void) 
 {
@@ -495,6 +511,24 @@ next_thread_to_run (void)
   else
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
 }
+*/
+
+/*
+ BSD: choose the highest non-empty ready_list in ready_array;
+ if empty, return idle_thread
+ */
+static struct thread *
+next_thread_to_run (void) 
+{
+  for (int i = 63; i >= 0; i--) {
+  	if (!list_empty (&ready_array[i])) {
+    		return list_entry (list_pop_front (&ready_array[i]), struct thread, elem);
+	}
+  }
+  return idle_thread;
+}
+
+
 
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
