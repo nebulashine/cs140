@@ -10,7 +10,7 @@ all: comb
 	./run.exe
 
 comb: fixed_point priority
-	$(CC) $(CFLAGS) -o run.exe priority-calc.o
+	$(CC) $(CFLAGS) -o run.exe fixed_point.h.gch priority-calc.o
 
 fixed_point: fixed_point.h
 	$(CC) $(CFLAGS) -c fixed_point.h
