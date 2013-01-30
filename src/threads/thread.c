@@ -8,6 +8,7 @@
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
@@ -24,6 +25,7 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 static struct list * ready_array;	/* 64 - ready list array for advance priority*/
+//static struct list ready_array[64];	/* 64 - ready list array for advance priority*/
 
 
 /* List of all processes.  Processes are added to this list
@@ -95,11 +97,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
 
-	/* allocate ready_array*/
-	ready_array = malloc(sizeof(struct list) * 64);
-	for (int i = 0; i < 64; i++) {
-		list_init (&ready_array[i]);
-	}
+
 
   list_init (&ready_list);
   list_init (&all_list);
@@ -119,6 +117,14 @@ thread_start (void)
   /* Create the idle thread. */
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
+
+	/* allocate ready_array*/
+	ready_array = (struct list *) malloc(sizeof(struct list) * 64);
+	int i;
+	for (i = 0; i < 64; i++) {
+		list_init (&ready_array[i]);
+	}
+
   thread_create ("idle", PRI_MIN, idle, &idle_started);
 
   /* Start preemptive thread scheduling. */
@@ -295,6 +301,8 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
+	/* free ready_array*/
+	free(ready_array);
   process_exit ();
 #endif
 
@@ -520,7 +528,8 @@ next_thread_to_run (void)
 static struct thread *
 next_thread_to_run (void) 
 {
-  for (int i = 63; i >= 0; i--) {
+  int i;
+  for (i = 63; i >= 0; i--) {
   	if (!list_empty (&ready_array[i])) {
     		return list_entry (list_pop_front (&ready_array[i]), struct thread, elem);
 	}
