@@ -183,71 +183,76 @@ if (os_ticks%222==0){
 }
 */
 
+if(thread_mlfqs){
+
+	  /* update recent_cpu & load_avg */
+	  
+	  if (timer_ticks() % 100 == 0) {
+
+		int j;
+		int sum = 0;
+		for (j = 0; j < 64; j++) {
+			sum += list_size(&ready_array[j]); // calculate total number of ready&running excluding idle threads
+		}
+		// KAI: SHOULD BE (SUM+1) | 
+		if (t != idle_thread) sum += 1;
+		else sum=0;
+	  	load_avg = load_avg_calc (load_avg, sum);	//calculate load_avg
+		//printf("\n");
+		//printf("sum = %d load_avg = %d\ CPU %d \n", sum, load_avg*100/N_2e14, t->recent_cpu/N_2e14); 
+		//printf("CURRENT :: recent cpu time: %d, nice: %d tid: %d priority %d name %s\n", t->recent_cpu *100/ N_2e14, t->nice, t->tid, t->priority, t->name);
+
+	   	struct list_elem *e;
+		//  iterate over all_list to update recent_cpu
+		//printf("----------\n");
+	   	for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)) {
+			struct thread *tt = list_entry(e, struct thread, allelem); //get the thread corresponding e
+	  		tt->recent_cpu = recent_cpu_calc (load_avg, tt->nice, tt->recent_cpu); //calculate recent cpu 
+			//printf("check tt %d %d %d %s %d\n", tt->nice, tt->priority, tt->tid, tt->name, tt->status);
+	   	}
+		//printf("----------\n");
+	  }
 
 
-  /* update recent_cpu & load_avg */
-  
-  if (timer_ticks() % 100 == 0) {
+	  /* Enforce preemption. */
 
-	int j;
-	int sum = 0;
-	for (j = 0; j < 64; j++) {
-		sum += list_size(&ready_array[j]); // calculate total number of ready&running excluding idle threads
+	 if (++thread_ticks >= TIME_SLICE) {
+	//enum intr_level old_level;
+	//old_level=intr_disable();
+
+	  //  clear all ready list 
+	  int j;
+	  for (j = 0; j < 64; j++) {
+	 	list_init(&ready_array[j]);
+	  }
+	 
+	  // iterate over all_list to update priority of ready & running threads
+	  struct list_elem *e;
+	  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)) {
+	  	struct thread *tt = list_entry(e, struct thread, allelem); //get the thread corresponding e
+		if (tt->status == THREAD_READY ) { 
+			//printf("recent CPU: %s %d \n",tt->name,  tt->recent_cpu / N_2e14);
+	  		tt->priority = priority_calc (tt->recent_cpu, tt->nice);
+			//printf("%s |CPU| %d |priority| %d |nice| %d \n", tt-> name , tt->recent_cpu/N_2e14, tt->priority, tt->nice);
+	  		list_push_back (&ready_array[tt->priority], &tt->elem);
+		}
+	  }
+		//printf("calculate running thread (BEFORE):%s priority %d\n", t->name, t->priority);
+		t->priority = priority_calc (t->recent_cpu, t->nice); // KAI: updated CURRENT_RUNNING thread
+		//printf("calculate running thread (AFTER): %s priority %d nice %d cpu %d\n",t->name, t->priority, t->nice, t->recent_cpu/N_2e14);
+		//intr_set_level(old_level);
+	  	intr_yield_on_return ();
+
+	  //if (intr_context()) printf("IN INTR CONTEXT!\n");
+	  //else printf("NOT IN INTR CONTEXT!\n\n");
+
+	  }
 	}
-	// KAI: SHOULD BE (SUM+1) | 
-	if (t != idle_thread) sum += 1;
-	else sum=0;
-  	load_avg = load_avg_calc (load_avg, sum);	//calculate load_avg
-	//printf("\n");
-	//printf("sum = %d load_avg = %d\ CPU %d \n", sum, load_avg*100/N_2e14, t->recent_cpu/N_2e14); 
-	//printf("CURRENT :: recent cpu time: %d, nice: %d tid: %d priority %d name %s\n", t->recent_cpu *100/ N_2e14, t->nice, t->tid, t->priority, t->name);
-
-   	struct list_elem *e;
-	//  iterate over all_list to update recent_cpu
-	//printf("----------\n");
-   	for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)) {
-		struct thread *tt = list_entry(e, struct thread, allelem); //get the thread corresponding e
-  		tt->recent_cpu = recent_cpu_calc (load_avg, tt->nice, tt->recent_cpu); //calculate recent cpu 
-		//printf("check tt %d %d %d %s %d\n", tt->nice, tt->priority, tt->tid, tt->name, tt->status);
-   	}
-	//printf("----------\n");
-  }
-
-
-  /* Enforce preemption. */
-
- if (++thread_ticks >= TIME_SLICE) {
-//enum intr_level old_level;
-//old_level=intr_disable();
-
-  //  clear all ready list 
-  int j;
-  for (j = 0; j < 64; j++) {
- 	list_init(&ready_array[j]);
-  }
- 
-  // iterate over all_list to update priority of ready & running threads
-  struct list_elem *e;
-  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)) {
-  	struct thread *tt = list_entry(e, struct thread, allelem); //get the thread corresponding e
-	if (tt->status == THREAD_READY ) { 
-		//printf("recent CPU: %s %d \n",tt->name,  tt->recent_cpu / N_2e14);
-  		tt->priority = priority_calc (tt->recent_cpu, tt->nice);
-		//printf("%s |CPU| %d |priority| %d |nice| %d \n", tt-> name , tt->recent_cpu/N_2e14, tt->priority, tt->nice);
-  		list_push_back (&ready_array[tt->priority], &tt->elem);
+	else{
+	 // original code
+	 if(++thread_ticks >= TIME_SLICE)
+		intr_yield_on_return();
 	}
-  }
-	//printf("calculate running thread (BEFORE):%s priority %d\n", t->name, t->priority);
-	t->priority = priority_calc (t->recent_cpu, t->nice); // KAI: updated CURRENT_RUNNING thread
-	//printf("calculate running thread (AFTER): %s priority %d nice %d cpu %d\n",t->name, t->priority, t->nice, t->recent_cpu/N_2e14);
-	//intr_set_level(old_level);
-  	intr_yield_on_return ();
-  }
-
-/* // original ocode
- if(++thread_ticks >= TIME_SLICE)
-	intr_yield_on_return();
-*/
 }
 
 /* Prints thread statistics. */
@@ -351,7 +356,24 @@ thread_unblock (struct thread *t)
 //  list_push_back (&ready_list, &t->elem);
   list_push_back (&ready_array[t->priority], &t->elem);
   t->status = THREAD_READY;
+ 
+//  if (intr_context()) printf("IN INTR CONTEXT!\n");
+//  else printf("NOT IN INTR CONTEXT!\n\n");
+
   intr_set_level (old_level);
+
+//  if (intr_context()) printf("IN INTR CONTEXT!\n");
+//  else printf("NOT IN INTR CONTEXT!\n\n");
+
+	if (!intr_context()){  
+	  int i;
+	  for (i = 63; i >= 0; i--) {
+	  	if (!list_empty (&ready_array[i])) {
+	    		if (i > t->priority) thread_yield();
+			break;
+		}
+	  }  
+	}
 }
 
 /* Returns the name of the running thread. */
@@ -453,7 +475,25 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  struct thread * t= thread_current();
+//  t->priority = new_priority;
+  if(t->base_priority == t->priority) t->priority = new_priority;
+  else t->priority = new_priority > t->priority ? new_priority : t->priority;
+  t->base_priority = new_priority;
+ 
+// FOR TEST ONLY:
+t->priority = new_priority;
+
+  int i;
+  for (i = 63; i >= 0; i--) {
+  	if (!list_empty (&ready_array[i])) {
+    		if (i > t->priority) thread_yield();
+		break;
+	}
+  }  
+
+//  thread_current ()->priority = new_priority;
+  
 	//HUANG if the current thread no longer has the highest priority, yields
 }
 
@@ -473,7 +513,16 @@ thread_set_nice (int nice UNUSED)
   t->nice = nice;
   t->priority = priority_calc (t->recent_cpu, t->nice); // changed by KAI to calculate priority, added KAI
 	//printf("%s %d\n", t->name, t->priority);
-  thread_yield(); //should change later, if running threads don;t have highest priority
+ 
+  int i;
+  for (i = 63; i >= 0; i--) {
+  	if (!list_empty (&ready_array[i])) {
+    		if (i > t->priority) thread_yield();
+		break;
+	}
+  }  
+
+//  thread_yield(); //should change later, if running threads don;t have highest priority
 }
 
 /* Returns the current thread's nice value. */
@@ -595,6 +644,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->recent_cpu = 0; /* initialize it to be 0*/
   t->nice = 0;	/* set to 0 */
   t->wake_tick = 0; /* set wake_tick to 0 */
+  
+  t->base_priority = priority; /* base priority when init threads */
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

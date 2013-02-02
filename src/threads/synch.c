@@ -57,6 +57,15 @@ sema_init (struct semaphore *sema, unsigned value)
    interrupt handler.  This function may be called with
    interrupts disabled, but if it sleeps then the next scheduled
    thread will probably turn interrupts back on. */
+// copy BELOW 
+bool list_larger (const struct list_elem *a,  
+                             const struct list_elem *b,  
+                             void *aux) {
+	struct thread *t_a = list_entry(a, struct thread, elem);
+	struct thread *t_b = list_entry(b, struct thread, elem);
+	return t_a->priority > t_b->priority;
+}
+
 void
 sema_down (struct semaphore *sema) 
 {
@@ -68,8 +77,9 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
-      thread_block ();
+      //list_push_back (&sema->waiters, &thread_current ()->elem); // so current threads in BLOCKED states
+	list_insert_ordered(&sema->waiters, &thread_current()->elem, list_larger, NULL);  // // sorted waiter list
+      	thread_block ();
     }
   sema->value--;
   intr_set_level (old_level);
@@ -295,7 +305,8 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  list_push_back (&cond->waiters, &waiter.elem);
+  //list_push_back (&cond->waiters, &waiter.elem);
+  list_insert_ordered(&cond->waiters, &waiter.elem, list_larger, NULL); // sorted waiter list
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);

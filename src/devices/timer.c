@@ -26,7 +26,7 @@ static struct list sleep_list;
 	struct list_elem elem;
 };*/
 
-bool list_cmp (const struct list_elem *a,  
+bool list_smaller (const struct list_elem *a,  
                              const struct list_elem *b,  
                              void *aux) {
 	struct thread *t_a = list_entry(a, struct thread, elem);
@@ -128,7 +128,7 @@ timer_sleep (int64_t ticks)
   cur->wake_tick = start + ticks;
 
   /* enqueue the current thread to sleep-thread list */
-  list_insert_ordered(&sleep_list, &cur->elem, list_cmp, NULL); 
+  list_insert_ordered(&sleep_list, &cur->elem, list_smaller, NULL); 
 
   /* interrupt disabled for thread_block requirement */
   enum intr_level old_level = intr_disable ();
