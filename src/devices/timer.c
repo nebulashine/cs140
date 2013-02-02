@@ -17,6 +17,23 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
+static struct list sleep_list;
+
+/* struct for restoring sleeping threads due to timer_sleep */
+/*struct sleep_thread {
+	int64_t wake_tick;
+	struct thread *t;
+	struct list_elem elem;
+};*/
+
+bool list_cmp (const struct list_elem *a,  
+                             const struct list_elem *b,  
+                             void *aux) {
+	struct thread *t_a = list_entry(a, struct thread, elem);
+	struct thread *t_b = list_entry(b, struct thread, elem);
+	return t_a->wake_tick < t_b->wake_tick;
+}
+
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
@@ -37,6 +54,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init(&sleep_list);	// initialize the sleep-thread-list
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -84,6 +102,8 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
+
+
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
@@ -92,8 +112,31 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
+/*
   while (timer_elapsed (start) < ticks) 
     thread_yield ();
+*/
+
+  if (ticks <= 0) {
+	return;
+  }
+
+  struct thread *cur = thread_current();
+//  struct sleep_thread *sleep = malloc(sizeof(struct sleep_thread));
+//  sleep->t = cur;
+//  sleep->wake_tick = start + ticks;
+  cur->wake_tick = start + ticks;
+
+  /* enqueue the current thread to sleep-thread list */
+  list_insert_ordered(&sleep_list, &cur->elem, list_cmp, NULL); 
+
+  /* interrupt disabled for thread_block requirement */
+  enum intr_level old_level = intr_disable ();
+
+  thread_block();
+
+  intr_set_level (old_level);
+
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -171,7 +214,42 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+
+/*
+  struct list_elem *e;
+  int count = 0;
+  for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)) {
+	
+    struct sleep_thread *st = list_entry(e, struct sleep_thread, elem);
+    if (st->wake_tick <= timer_ticks()) {  // ticks? or call timer_tick()?
+      thread_unblock(st->t);
+      count++;
+    } else break;
+	//printf("%s: wake_time: %"PRId64", current_time: %"PRId64", diff: %"PRId64" \n", st->t->name, st->wake_tick, ticks, st->wake_tick-ticks);
+  }
+*/
+
+  while (!list_empty(&sleep_list)) {
+    struct list_elem *e = list_front(&sleep_list);
+    struct thread *t = list_entry(e, struct thread, elem);
+    if (t->wake_tick <= timer_ticks()) {
+      list_pop_front(&sleep_list);
+      thread_unblock(t);
+    } else break;
+  }  
+
+  
   thread_tick ();
+
+/*
+  if(intr_context()) printf("IN Interrupt Context.\n");
+  else printf("NOT IN Interrupt Context.\n");  
+
+  for (count; count > 0; count--) {
+    free(list_entry(list_pop_front(&sleep_list), struct sleep_thread, elem));
+  }
+*/
+
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
