@@ -158,14 +158,15 @@ thread_tick (void)
 #ifdef USERPROG
   else if (t->pagedir != NULL){
     user_ticks++;
-    t->recent_cpu += 16384;	//Increment the running thread's recent_cpu on every tick
-				// tick value revised by KAI
   }
 #endif
   else {
     kernel_ticks++;
-    t->recent_cpu += 16384;	//Increment the running thread's recent_cpu on every tick
+
   }
+  if (thread_mlfqs) {
+  	t->recent_cpu += 16384;	//Increment the running thread's recent_cpu on every tick
+  }				// tick value revised by KAI
 
 //  os_ticks++;	//always increase by 1 on clock tick
   
@@ -248,7 +249,7 @@ if(thread_mlfqs){
 
 	  }
 	}
-	else{
+	else{	// if not -mlfqs
 	 // original code
 	 if(++thread_ticks >= TIME_SLICE)
 		intr_yield_on_return();
@@ -365,15 +366,29 @@ thread_unblock (struct thread *t)
 //  if (intr_context()) printf("IN INTR CONTEXT!\n");
 //  else printf("NOT IN INTR CONTEXT!\n\n");
 
-	if (!intr_context()){  
-	  int i;
-	  for (i = 63; i >= 0; i--) {
-	  	if (!list_empty (&ready_array[i])) {
-	    		if (i > t->priority) thread_yield();
-			break;
-		}
-	  }  
-	}
+	/* avoid situation when is called in timer_interrupt*/
+
+  	if (!intr_context()){  
+    		int i;
+    		for (i = 63; i >= 0; i--) {
+			printf("current: %s -- priority: %d. in loop\n", thread_current()->name, i);
+    			if (!list_empty (&ready_array[i])) {
+      				//if (i >= t->priority) thread_yield();
+				struct thread *temp_t = list_entry(list_rbegin(&ready_array[i]), struct thread, elem);
+				printf("thread in ready_array: %s priority: %d\n", temp_t->name, temp_t->priority);
+				printf("current: %s -- priority: %d. before check\n", thread_current()->name, thread_current()->priority);
+      				//if (thread_current != idle_thread && i > thread_current()->priority) {
+      				if (i > thread_current()->priority) {
+					printf("current_thread: %s pri: %d\n", thread_current()->name, thread_current()->priority);
+					printf("priority: %d. before yield\n", i);
+					thread_yield();
+					printf("priority: %d. after yield\n", i);
+				}
+  				break;
+  			}
+   		 }
+  	}
+
 }
 
 /* Returns the name of the running thread. */
@@ -481,8 +496,6 @@ thread_set_priority (int new_priority)
   else t->priority = new_priority > t->priority ? new_priority : t->priority;
   t->base_priority = new_priority;
  
-// FOR TEST ONLY:
-t->priority = new_priority;
 
   int i;
   for (i = 63; i >= 0; i--) {

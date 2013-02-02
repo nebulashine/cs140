@@ -101,6 +101,7 @@ struct thread
 
     int recent_cpu;			/* Recent cpu occupancy of this thread. Fixd-point. */
     int nice;				/* Integer -20 ~ 20 */
+    struct thread *donated_t;          /* pointer to the thread that's been donated by the current thread */
 
     int64_t wake_tick;			/* Time (in ticks) to wake up when sleeping. */
 
