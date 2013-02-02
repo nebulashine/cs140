@@ -55,7 +55,7 @@ struct kernel_thread_frame
 static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
-static long long os_ticks;    	/* # of timer ticks: from timer tick to os start */
+//static long long os_ticks;    	/* # of timer ticks: from timer tick to os start */
 
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
@@ -160,14 +160,14 @@ thread_tick (void)
     user_ticks++;
     t->recent_cpu += 16384;	//Increment the running thread's recent_cpu on every tick
 				// tick value revised by KAI
-}
+  }
 #endif
   else {
     kernel_ticks++;
     t->recent_cpu += 16384;	//Increment the running thread's recent_cpu on every tick
-}
+  }
 
-  os_ticks++;	//always increase by 1 on clock tick
+//  os_ticks++;	//always increase by 1 on clock tick
   
 /*
 if (os_ticks%222==0){
@@ -187,7 +187,7 @@ if (os_ticks%222==0){
 
   /* update recent_cpu & load_avg */
   
-  if (os_ticks % 100 == 0) {
+  if (timer_ticks() % 100 == 0) {
 
 	int j;
 	int sum = 0;
@@ -454,12 +454,14 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+	//HUANG if the current thread no longer has the highest priority, yields
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
+	//HUANG In the presence of priority donation, returns the higher (donated) priority
   return thread_current ()->priority;
 }
 
@@ -471,7 +473,7 @@ thread_set_nice (int nice UNUSED)
   t->nice = nice;
   t->priority = priority_calc (t->recent_cpu, t->nice); // changed by KAI to calculate priority, added KAI
 	//printf("%s %d\n", t->name, t->priority);
-  //thread_yield(); //should change later, if running threads don;t have highest priority
+  thread_yield(); //should change later, if running threads don;t have highest priority
 }
 
 /* Returns the current thread's nice value. */
