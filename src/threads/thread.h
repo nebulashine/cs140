@@ -101,6 +101,8 @@ struct thread
     int recent_cpu;			/* Recent cpu occupancy of this thread. Fixd-point. */
     int nice;				/* Integer -20 ~ 20 */
 
+    int64_t wake_tick;			/* Time (in ticks) to wake up when sleeping. */
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
