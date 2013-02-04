@@ -32,6 +32,26 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+/*
+ * our own call-back function
+ */
+bool list_larger (const struct list_elem *a,  
+                             const struct list_elem *b,  
+                             void *aux) {
+	struct thread *t_a = list_entry(a, struct thread, elem);
+	struct thread *t_b = list_entry(b, struct thread, elem);
+	return t_a->priority > t_b->priority;
+}
+
+bool lock_list_larger (const struct list_elem *a,  
+                             const struct list_elem *b,  
+                             void *aux) {
+	struct lock *l_a = list_entry(a, struct lock, lock_elem);
+	struct lock *l_b = list_entry(b, struct lock, lock_elem);
+	return l_a->priority > l_b->priority;
+}
+
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -58,21 +78,6 @@ sema_init (struct semaphore *sema, unsigned value)
    interrupts disabled, but if it sleeps then the next scheduled
    thread will probably turn interrupts back on. */
 // copy BELOW 
-bool list_larger (const struct list_elem *a,  
-                             const struct list_elem *b,  
-                             void *aux) {
-	struct thread *t_a = list_entry(a, struct thread, elem);
-	struct thread *t_b = list_entry(b, struct thread, elem);
-	return t_a->priority > t_b->priority;
-}
-
-bool lock_list_larger (const struct list_elem *a,  
-                             const struct list_elem *b,  
-                             void *aux) {
-	struct lock *l_a = list_entry(a, struct lock, lock_elem);
-	struct lock *l_b = list_entry(b, struct lock, lock_elem);
-	return l_a->priority > l_b->priority;
-}
 
 void
 sema_down (struct semaphore *sema) 
@@ -132,9 +137,11 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   sema->value++;
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  if (!list_empty (&sema->waiters)) { 
+    // sort the waiter list before thread_unblock, in case threads' priorities changed
+    list_sort (&sema->waiters, list_larger, NULL);
+    thread_unblock (list_entry (list_pop_front (&sema->waiters), struct thread, elem));
+  }
   intr_set_level (old_level);
 }
 
