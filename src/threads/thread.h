@@ -111,7 +111,6 @@ struct thread
     int nice;				/* Integer -20 ~ 20 */
     struct thread *donated_t;          /* pointer to the thread that's been donated by the current thread */
 
-    //struct list *lock_priority;		/* storting the locks that are acquired by other higher priority threads */
     struct list lock_priority;		/* storting the locks that are acquired by other higher priority threads */
 
     int64_t wake_tick;			/* Time (in ticks) to wake up when sleeping. */

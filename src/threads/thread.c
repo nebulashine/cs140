@@ -279,8 +279,6 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  if (t != idle_thread)
-  list_init(&t->lock_priority);
   return tid;
 }
 
@@ -601,6 +599,9 @@ init_thread (struct thread *t, const char *name, int priority)
   
   
 
+	//initialize lock_priority 
+  list_init(&t->lock_priority);
+
   t->base_priority = priority; /* base priority when init threads */
 
   old_level = intr_disable ();
@@ -690,7 +691,7 @@ thread_schedule_tail (struct thread *prev)
       ASSERT (prev != cur);
 
 	  /* free thread->lockP_priority */
-  //	free(prev->lock_priority);
+  	//free(prev->lock_priority);
       palloc_free_page (prev);
     }
 }

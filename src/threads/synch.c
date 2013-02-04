@@ -221,9 +221,32 @@ lock_acquire (struct lock *lock)
   /* add lock_holder's lock_pri if current priority is larger than the lock_holder's priority */
   if (lock->holder != NULL) {
 	if (cur->priority > lock->holder->priority) {
-		lock->priority = cur->priority;
-		//list_insert_ordered(&lock->holder->lock_priority, &lock->lock_elem, lock_list_larger, NULL);  
-		list_push_back(&lock->holder->lock_priority, &lock->lock_elem);
+
+	//	if (lock->priority < cur->priority) {
+			lock->priority = cur->priority;
+	//	}
+
+		/* check if lock holder's lock_priority already contains the lock */
+		bool contains_lock = false;
+	  	struct list_elem *e;
+	  	for(e=list_begin(&lock->holder->lock_priority); e!=list_end(&lock->holder->lock_priority); e=list_next(e)){
+	  	      struct lock *temp_l = list_entry(e, struct lock, lock_elem);
+	  	      if (lock == temp_l) {
+			contains_lock = true;
+	  	      	break;
+	  	      }
+	  	}
+
+		if (!contains_lock) {
+			list_insert_ordered(&lock->holder->lock_priority, &lock->lock_elem, lock_list_larger, NULL);  
+		} else {
+			list_remove(&lock->lock_elem);
+			list_insert_ordered(&lock->holder->lock_priority, &lock->lock_elem, lock_list_larger, NULL);  
+		}
+		//enum intr_level old_level;
+  		//old_level = intr_disable ();
+		//list_push_back(&lock->holder->lock_priority, &lock->lock_elem);
+  		//intr_set_level (old_level);
 	}
   }
 
@@ -271,32 +294,23 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
-/*
   struct list_elem *e;
-  struct lock_pri *l_node;
   for(e=list_begin(&lock->holder->lock_priority); e!=list_end(&lock->holder->lock_priority); e=list_next(e)){
-	struct lock_pri *l_node = list_entry(e, struct lock_pri, lock_elem);
-	struct lock *temp_l = l_node->l;
+	struct lock *temp_l = list_entry(e, struct lock, lock_elem);
 	if (lock == temp_l) {
 		list_remove (e);
-		free(l_node);
 		break;
 	}
-
   }
-
 	// update lock holder's priority 
-  if (list_empty(lock->holder->lock_priority)) { 
+  if (list_empty(&lock->holder->lock_priority)) { 
   	// reset priority to base_priority after releasing lock 
   	lock->holder->priority = lock->holder->base_priority;
   } else {
 	e = list_begin(&lock->holder->lock_priority);
-	struct lock_pri *l_node = list_entry(e, struct lock_pri, lock_elem);
-	lock->holder->priority = l_node->priority;	
+	struct lock *l = list_entry(e, struct lock, lock_elem);
+	lock->holder->priority = l->priority;	
   }
-*/
-  	// reset priority to base_priority after releasing lock 
-  	lock->holder->priority = lock->holder->base_priority;
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
