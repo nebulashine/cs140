@@ -5,6 +5,14 @@
 #include <list.h>
 #include <stdint.h>
 
+/* struct for lock priority */
+struct lock_pri {
+	int priority;
+	struct lock *l;
+	struct list_elem lock_elem;
+};
+
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -102,6 +110,9 @@ struct thread
     int recent_cpu;			/* Recent cpu occupancy of this thread. Fixd-point. */
     int nice;				/* Integer -20 ~ 20 */
     struct thread *donated_t;          /* pointer to the thread that's been donated by the current thread */
+
+    //struct list *lock_priority;		/* storting the locks that are acquired by other higher priority threads */
+    struct list lock_priority;		/* storting the locks that are acquired by other higher priority threads */
 
     int64_t wake_tick;			/* Time (in ticks) to wake up when sleeping. */
 

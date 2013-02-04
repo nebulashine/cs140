@@ -66,6 +66,14 @@ bool list_larger (const struct list_elem *a,
 	return t_a->priority > t_b->priority;
 }
 
+bool lock_list_larger (const struct list_elem *a,  
+                             const struct list_elem *b,  
+                             void *aux) {
+	struct lock *l_a = list_entry(a, struct lock, lock_elem);
+	struct lock *l_b = list_entry(b, struct lock, lock_elem);
+	return l_a->priority > l_b->priority;
+}
+
 void
 sema_down (struct semaphore *sema) 
 {
@@ -210,6 +218,15 @@ lock_acquire (struct lock *lock)
   struct thread *cur = thread_current();
   struct thread *t;
 
+  /* add lock_holder's lock_pri if current priority is larger than the lock_holder's priority */
+  if (lock->holder != NULL) {
+	if (cur->priority > lock->holder->priority) {
+		lock->priority = cur->priority;
+		//list_insert_ordered(&lock->holder->lock_priority, &lock->lock_elem, lock_list_larger, NULL);  
+		list_push_back(&lock->holder->lock_priority, &lock->lock_elem);
+	}
+  }
+
   if (lock->holder != NULL) {
       cur->donated_t = lock->holder;
       t = lock->holder;
@@ -254,9 +271,33 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
-  /* reset priority to base_priority after releasing lock */
-  lock->holder->priority = lock->holder->base_priority;
-  
+/*
+  struct list_elem *e;
+  struct lock_pri *l_node;
+  for(e=list_begin(&lock->holder->lock_priority); e!=list_end(&lock->holder->lock_priority); e=list_next(e)){
+	struct lock_pri *l_node = list_entry(e, struct lock_pri, lock_elem);
+	struct lock *temp_l = l_node->l;
+	if (lock == temp_l) {
+		list_remove (e);
+		free(l_node);
+		break;
+	}
+
+  }
+
+	// update lock holder's priority 
+  if (list_empty(lock->holder->lock_priority)) { 
+  	// reset priority to base_priority after releasing lock 
+  	lock->holder->priority = lock->holder->base_priority;
+  } else {
+	e = list_begin(&lock->holder->lock_priority);
+	struct lock_pri *l_node = list_entry(e, struct lock_pri, lock_elem);
+	lock->holder->priority = l_node->priority;	
+  }
+*/
+  	// reset priority to base_priority after releasing lock 
+  	lock->holder->priority = lock->holder->base_priority;
+
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }

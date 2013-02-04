@@ -273,9 +273,14 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+	/* init struct list * lock_priority for each new thread */
+//  t->lock_priority = (struct list*) malloc(sizeof(struct list));
+
   /* Add to run queue. */
   thread_unblock (t);
 
+  if (t != idle_thread)
+  list_init(&t->lock_priority);
   return tid;
 }
 
@@ -594,6 +599,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->nice = 0;	/* set to 0 */
   t->wake_tick = 0; /* set wake_tick to 0 */
   
+  
+
   t->base_priority = priority; /* base priority when init threads */
 
   old_level = intr_disable ();
@@ -681,6 +688,9 @@ thread_schedule_tail (struct thread *prev)
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) 
     {
       ASSERT (prev != cur);
+
+	  /* free thread->lockP_priority */
+  //	free(prev->lock_priority);
       palloc_free_page (prev);
     }
 }
