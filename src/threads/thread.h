@@ -112,6 +112,7 @@ struct thread
     struct thread *donated_t;          /* pointer to the thread that's been donated by the current thread */
 
     struct list lock_priority;		/* storting the locks that are acquired by other higher priority threads */
+    struct lock *acq_lock;		/* keep record of which lock the thread is currently acquiring */
 
     int64_t wake_tick;			/* Time (in ticks) to wake up when sleeping. */
 

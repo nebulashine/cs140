@@ -217,6 +217,9 @@ lock_acquire (struct lock *lock)
   /* implememt priority donation */
   struct thread *cur = thread_current();
   struct thread *t;
+  struct thread *donor;		// keep record of the donar for upating lock's priority
+
+  cur->acq_lock = lock;		// mark the lock that the current thread is acquiring
 
   /* add lock_holder's lock_pri if current priority is larger than the lock_holder's priority */
   if (lock->holder != NULL) {
@@ -253,8 +256,13 @@ lock_acquire (struct lock *lock)
   if (lock->holder != NULL) {
       cur->donated_t = lock->holder;
       t = lock->holder;
-      while (t != NULL) {
-          if (t->priority < cur->priority) t->priority = cur->priority;
+      donor = cur;	//donor is the thread donates to t
+      while (t != NULL) {	// t is the thread to be donated
+          if (t->priority < cur->priority) {
+		t->priority = cur->priority;
+	  	donor->acq_lock->priority = cur->priority;
+	  }
+	  donor = t;
           t = t->donated_t;
       }
   }
@@ -294,6 +302,7 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+	/* check if the lock to be released is in lock_priority list. if yes, remove it from the list  */
   struct list_elem *e;
   for(e=list_begin(&lock->holder->lock_priority); e!=list_end(&lock->holder->lock_priority); e=list_next(e)){
 	struct lock *temp_l = list_entry(e, struct lock, lock_elem);
@@ -302,6 +311,7 @@ lock_release (struct lock *lock)
 		break;
 	}
   }
+
 	// update lock holder's priority 
   if (list_empty(&lock->holder->lock_priority)) { 
   	// reset priority to base_priority after releasing lock 
@@ -311,7 +321,6 @@ lock_release (struct lock *lock)
 	struct lock *l = list_entry(e, struct lock, lock_elem);
 	lock->holder->priority = l->priority;	
   }
-
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }
