@@ -31,6 +31,23 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
+
+	/* HUANG Implementation*/
+
+  char *save_ptr;	//keep track of the tokenizer's position
+  char *my_fn_copy;	//a modifiable string to be used in strtok_r
+  char *token_file_name;	//store the file name (first token in file_name)
+
+  my_fn_copy = malloc (strlen(file_name) + 1);	//allocate memory for my_fn_copy
+  if (my_fn_copy == NULL) {			//check if allocation successful
+  	goto THE_END;
+  } 
+  memcpy(my_fn_copy, file_name, strlen(file_name) + 1);
+  token_file_name = strtok_r(my_fn_copy, " ", &save_ptr); //get the file name 
+
+	/* == HUANG Implementation*/
+
+
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -39,7 +56,17 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+	/* Original code
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy); */
+
+
+	/* HUANG Implementation*/
+  tid = thread_create (token_file_name, PRI_DEFAULT, start_process, fn_copy); 
+
+THE_END:
+  free (my_fn_copy);
+	/* == HUANG Implementation*/
+
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -59,8 +86,70 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+
+
+	/* HUANG Implementation*/
+  void *start_argv = NULL;	//keep track of the addr of argv[0]
+  char *my_fn_copy;	//a modifiable string to be used in strtok_r
+  char *token;		//to be used in strtok_r for loop
+  char *save_ptr;	//keep track of the tokenizer's position
+  int len_fn = strlen(file_name); 	//keep track of the length of file_name
+  int argc = 0;			//keep track of number of argv
+  int offset_argv[64];		//keep track of the argv token's position offsets;limiting 64 tokens in the argument here; if need to test long tokens, may have to increase the limit here; 
+
+  offset_argv[0] = 0;		//first argv is just at the start_ptr, offset is 0
+  for (
+	token = strtok_r (file_name, " ", &save_ptr); token != NULL;
+	token = strtok_r (NULL, " ", &save_ptr)
+      ) {
+	while (*save_ptr == ' ') {
+		save_ptr++;
+	}
+	argc++;
+	offset_argv[argc] = save_ptr - file_name;
+  }
+	/* == HUANG Implementation*/
+
+
+	/* has to call load after the above, so that fine_name is the first token of file_name_ */
   success = load (file_name, &if_.eip, &if_.esp);
 
+
+	/* == HUANG Implementation*/
+  if (!success) {
+	goto THE_END;
+  }
+
+  if_.esp -= len_fn + 1;	//ready to copy the whole file_name 
+  start_argv = if_.esp;	//keep track of the start of tokens
+  if_.esp -= (4 - (len_fn + 1) % 4) % 4;	//word-align, rought stack pointer down to a multiple of 4 before the first push; 
+  memcpy(start_argv, file_name, len_fn + 1);	//push tokens(c-string)
+  if_.esp -= 4;
+  *(int *)if_.esp = 0; //as a C standard, argv[argc] has to be 0
+
+  //push address of each token (right to left) 
+  int i;
+  for (i = argc - 1; i >= 0; i--) {
+	if_.esp -= 4;	//make one more space for storing address
+	*(void **)if_.esp = start_argv + offset_argv[i]; 
+  }
+
+  //push argv
+  if_.esp -= 4;
+  *(void **)if_.esp = if_.esp + 4;
+
+  //push argc
+  if_.esp -= 4;
+  *(int *)if_.esp = argc;
+
+  //push face return address
+  if_.esp -= 4;
+  *(int *)if_.esp = 0;
+
+	/* == HUANG Implementation*/
+
+
+THE_END:
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
