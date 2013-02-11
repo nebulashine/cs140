@@ -32,7 +32,7 @@ process_execute (const char *file_name)
   tid_t tid;
 
 
-	/* HUANG Implementation*/
+	/* HUANG Implementation */
 
   char *save_ptr;	//keep track of the tokenizer's position
   char *my_fn_copy;	//a modifiable string to be used in strtok_r
@@ -45,7 +45,7 @@ process_execute (const char *file_name)
   memcpy(my_fn_copy, file_name, strlen(file_name) + 1);
   token_file_name = strtok_r(my_fn_copy, " ", &save_ptr); //get the file name 
 
-	/* == HUANG Implementation*/
+	/* == HUANG Implementation */
 
 
   /* Make a copy of FILE_NAME.
@@ -56,16 +56,16 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-	/* Original code
+	/* Original Code
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy); */
 
 
-	/* HUANG Implementation*/
+	/* HUANG Implementation */
   tid = thread_create (token_file_name, PRI_DEFAULT, start_process, fn_copy); 
 
 THE_END:
   free (my_fn_copy);
-	/* == HUANG Implementation*/
+	/* == HUANG Implementation */
 
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
@@ -88,7 +88,7 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
 
 
-	/* HUANG Implementation*/
+	/* HUANG Implementation */
   void *start_argv = NULL;	//keep track of the addr of argv[0]
   char *my_fn_copy;	//a modifiable string to be used in strtok_r
   char *token;		//to be used in strtok_r for loop
@@ -108,14 +108,14 @@ start_process (void *file_name_)
 	argc++;
 	offset_argv[argc] = save_ptr - file_name;
   }
-	/* == HUANG Implementation*/
+	/* == HUANG Implementation */
 
 
 	/* has to call load after the above, so that fine_name is the first token of file_name_ */
   success = load (file_name, &if_.eip, &if_.esp);
 
 
-	/* == HUANG Implementation*/
+	/* == HUANG Implementation */
   if (!success) {
 	goto THE_END;
   }
@@ -146,7 +146,7 @@ start_process (void *file_name_)
   if_.esp -= 4;
   *(int *)if_.esp = 0;
 
-	/* == HUANG Implementation*/
+	/* == HUANG Implementation */
 
 
 THE_END:
